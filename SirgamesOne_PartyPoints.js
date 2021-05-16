@@ -43,11 +43,22 @@ SirgamesOne.PartyPoints.version = 1.0;
  */
 
 
+/* Knowed Bugs:
+ * scompare se si seleziona options dal menu
+ * I party points non si aggiornano per i nemici allo start della action (altrimenti gli conta il guard del turno precedente nei PP)
+ *
+ * TODOs:
+ * Aggiungere icona status da opzioni del plugin
+ * aggiungere opzioni di target se PP party > PP nemici
+ * Integrare con la funzione di targets
+ */
 
+//=============================================================================
+// Initialize (called at the start of the game)
+//=============================================================================
 SirgamesOne.PartyPoints._initialize = function() {
 	SirgamesOne.PartyPoints.statusGroupList = [];
 	SirgamesOne.PartyPoints.pointList = [];
-
 
 	SirgamesOne.PartyPoints.Parameters = PluginManager.parameters('SirgamesOne_PartyPoints');
 	SirgamesOne.PartyPoints.Parameters['Party Points Award List'] = JSON.parse(SirgamesOne.PartyPoints.Parameters['Party Points Award List']);
@@ -64,10 +75,28 @@ SirgamesOne.PartyPoints._initialize = function() {
 		});
 }
 
+SirgamesOne.PartyPoints._initialize();
+
+
+// update solo se currentValue != lastValue
+SirgamesOne.PartyPoints.update = function() {
+	const partyPointsAllies = $gameParty.partyPoints();
+	const partyPointsEnemies = $gameTroop.partyPoints();
+
+	if (this.partyPointsAllies == null || this.partyPointsAllies != partyPointsAllies) {
+		this.partyPointsAllies = partyPointsAllies;
+		this._updateAlliesPartyPointsWindow(partyPointsAllies);
+	}
+
+	if (this.partyPointsEnemies == null || this.partyPointsEnemies != partyPointsEnemies) {
+		this.partyPointsEnemies = partyPointsEnemies;
+		this._updateEnemiesPartyPointsWindow(partyPointsEnemies);
+	}
+}
+
 //=============================================================================
 // Game_Battler
 //=============================================================================
-
 Game_Battler.prototype.calculatePartyPoints = function() {
 	let resultPoints = 0;
 	for (let i = 0; i < SirgamesOne.PartyPoints.statusGroupList.length; i++) {
@@ -82,10 +111,8 @@ Game_Battler.prototype.calculatePartyPoints = function() {
 }
 
 //=============================================================================
-// Game_Unit
+// Game_Unit - Calculate party points for the game unit
 //=============================================================================
-
-
 Game_Unit.prototype.partyPoints = function() {
 	let totalPartyPoints = 0;
 	for (let member of this.aliveMembers()) {
@@ -96,4 +123,63 @@ Game_Unit.prototype.partyPoints = function() {
 
 
 
-SirgamesOne.PartyPoints._initialize();
+//=============================================================================
+// ** Spriteset_Battle - Draw Party points in battle
+//=============================================================================	
+
+var _sirgamesone_partyPoints_createUpperLayer = Spriteset_Battle.prototype.createUpperLayer;
+Spriteset_Battle.prototype.createUpperLayer = function() {
+	this.createPartyPointsSprites();
+	_sirgamesone_partyPoints_createUpperLayer.call(this);	
+};
+
+Spriteset_Battle.prototype.createPartyPointsSprites = function() {
+
+	const boxWidth = Graphics.boxWidth;
+
+	SirgamesOne.PartyPoints.windowAlliesPartyPoints = new Window_Base(new Rectangle(boxWidth - boxWidth / 4, 25, ImageManager.iconWidth+22, ImageManager.iconHeight+22));
+	SirgamesOne.PartyPoints.windowEnemiesPartyPoints = new Window_Base(new Rectangle(boxWidth / 4, 25, ImageManager.iconWidth+22, ImageManager.iconHeight+22));
+
+
+	SirgamesOne.PartyPoints.update();
+
+	this._battleField.addChild(SirgamesOne.PartyPoints.windowAlliesPartyPoints);	
+	this._battleField.addChild(SirgamesOne.PartyPoints.windowEnemiesPartyPoints);
+}
+
+
+SirgamesOne.PartyPoints._updateAlliesPartyPointsWindow = function(points) {
+	this.windowAlliesPartyPoints.destroyContents();
+	this.windowAlliesPartyPoints.createContents();
+	this.windowAlliesPartyPoints.drawIcon(81, 0, 0);
+	this.windowAlliesPartyPoints.drawText(points, 0, 0, 33, 22, "center");
+}
+
+SirgamesOne.PartyPoints._updateEnemiesPartyPointsWindow = function(points) {
+	this.windowEnemiesPartyPoints.destroyContents();
+	this.windowEnemiesPartyPoints.createContents();
+	this.windowEnemiesPartyPoints.drawIcon(81, 0, 0);
+	this.windowEnemiesPartyPoints.drawText(points, 0, 0, 33, 22, "center");
+}
+
+
+//=============================================================================
+// ** BattleManager
+//=============================================================================	
+
+
+var _sirgamesone_partyPoints_battleManager_startTurn = BattleManager.startActorInput;
+BattleManager.startActorInput = function() {
+	_sirgamesone_partyPoints_battleManager_startTurn.call(this);
+	SirgamesOne.PartyPoints.update();
+}
+
+
+var _sirgamesone_partyPoints_battleManager_endAction = BattleManager.endAction;
+BattleManager.endAction = function() {
+	_sirgamesone_partyPoints_battleManager_endAction.call(this);
+	SirgamesOne.PartyPoints.update();
+}
+
+
+
