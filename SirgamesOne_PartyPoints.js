@@ -1,18 +1,29 @@
 //=============================================================================
 // SirgamesOne Plugins - RPG Maker MZ - Party Points
-// SirgamesOne_PartyPoints.js 1.0
+// SirgamesOne_PartyPoints.js 1.1
 //=============================================================================
 
 var SirgamesOne = SirgamesOne || {};
 SirgamesOne.PartyPoints = SirgamesOne.PartyPoints || {};
-SirgamesOne.PartyPoints.version = 1.0;
+SirgamesOne.PartyPoints.version = 1.1;
 
 //=============================================================================
  /*:
  * @target MZ
- * @plugindesc v1.0 count points for each Game Unit (allies and troops) based different status
+ * @plugindesc v1.1 count points for each Game Unit (allies and troops) based different status
  * @author SirgamesOne
+ * @help ====== SirgamesOne Party Points ===========
+ * This plugin provides a way to count "Party Points" based on a set of status that a battler must have
+ * points are provided for usage in:
  *
+ * $gameParty.partyPoints() or 
+ * $gameTroop.partyPoints() or 
+ *
+ *
+ * the variables are stored in (useful for performance in passive state):
+ *
+ * SirgamesOne.PartyPoints.partyPointsAllies
+ * SirgamesOne.PartyPoints.partyPointsEnemies
  *
  * @param Party Points Award List
  * @type struct<PartyPointAward>[]
@@ -43,10 +54,7 @@ SirgamesOne.PartyPoints.version = 1.0;
  */
 
 
-/* Knowed Bugs:
- * scompare se si seleziona options dal menu
- * I party points non si aggiornano per i nemici allo start della action (altrimenti gli conta il guard del turno precedente nei PP)
- *
+ /*
  * TODOs:
  * Aggiungere icona status da opzioni del plugin
  * aggiungere opzioni di target se PP party > PP nemici
@@ -83,7 +91,7 @@ SirgamesOne.PartyPoints.update = function() {
 	const partyPointsAllies = $gameParty.partyPoints();
 	const partyPointsEnemies = $gameTroop.partyPoints();
 
-	if (this.partyPointsAllies == null || this.partyPointsAllies != partyPointsAllies) {
+	if ( this.partyPointsAllies == null || this.partyPointsAllies != partyPointsAllies) {
 		this.partyPointsAllies = partyPointsAllies;
 		this._updateAlliesPartyPointsWindow(partyPointsAllies);
 	}
@@ -92,6 +100,17 @@ SirgamesOne.PartyPoints.update = function() {
 		this.partyPointsEnemies = partyPointsEnemies;
 		this._updateEnemiesPartyPointsWindow(partyPointsEnemies);
 	}
+}
+
+SirgamesOne.PartyPoints.forceUpdate = function() {
+	const partyPointsAllies = $gameParty.partyPoints();
+	const partyPointsEnemies = $gameTroop.partyPoints();
+
+	this.partyPointsAllies = partyPointsAllies;
+	this._updateAlliesPartyPointsWindow(partyPointsAllies);
+
+	this.partyPointsEnemies = partyPointsEnemies;
+	this._updateEnemiesPartyPointsWindow(partyPointsEnemies);
 }
 
 //=============================================================================
@@ -123,6 +142,13 @@ Game_Unit.prototype.partyPoints = function() {
 
 
 
+const _sirgamesone_partyPoints_battleManager_onBattleStart = Game_Unit.prototype.onBattleStart;
+Game_Unit.prototype.onBattleStart = function() {
+	_sirgamesone_partyPoints_battleManager_onBattleStart.call(this);
+	SirgamesOne.PartyPoints.update();
+}
+
+
 //=============================================================================
 // ** Spriteset_Battle - Draw Party points in battle
 //=============================================================================	
@@ -152,14 +178,14 @@ SirgamesOne.PartyPoints._updateAlliesPartyPointsWindow = function(points) {
 	this.windowAlliesPartyPoints.destroyContents();
 	this.windowAlliesPartyPoints.createContents();
 	this.windowAlliesPartyPoints.drawIcon(81, 0, 0);
-	this.windowAlliesPartyPoints.drawText(points, 0, 0, 33, 22, "center");
+	this.windowAlliesPartyPoints.drawText(points, 10, 0, 33, 22, "center");
 }
 
 SirgamesOne.PartyPoints._updateEnemiesPartyPointsWindow = function(points) {
 	this.windowEnemiesPartyPoints.destroyContents();
 	this.windowEnemiesPartyPoints.createContents();
 	this.windowEnemiesPartyPoints.drawIcon(81, 0, 0);
-	this.windowEnemiesPartyPoints.drawText(points, 0, 0, 33, 22, "center");
+	this.windowEnemiesPartyPoints.drawText(points, 10, 0, 33, 22, "center");
 }
 
 
@@ -168,17 +194,28 @@ SirgamesOne.PartyPoints._updateEnemiesPartyPointsWindow = function(points) {
 //=============================================================================	
 
 
-var _sirgamesone_partyPoints_battleManager_startTurn = BattleManager.startActorInput;
-BattleManager.startActorInput = function() {
-	_sirgamesone_partyPoints_battleManager_startTurn.call(this);
+const _sirgamesone_partyPoints_battleManager_onTurnEnd = Game_Battler.prototype.onTurnEnd;
+Game_Battler.prototype.onTurnEnd = function() {
+	_sirgamesone_partyPoints_battleManager_onTurnEnd.call(this);
 	SirgamesOne.PartyPoints.update();
 }
 
 
-var _sirgamesone_partyPoints_battleManager_endAction = BattleManager.endAction;
+const _sirgamesone_partyPoints_battleManager_endAction = BattleManager.endAction;
 BattleManager.endAction = function() {
 	_sirgamesone_partyPoints_battleManager_endAction.call(this);
 	SirgamesOne.PartyPoints.update();
+}
+
+
+//=============================================================================
+// ** Scene_Battle
+//=============================================================================	
+
+const _sirgamesone_partyPoints_battleManager_createAllWindows = Scene_Battle.prototype.createAllWindows;
+Scene_Battle.prototype.createAllWindows = function() {
+	_sirgamesone_partyPoints_battleManager_createAllWindows.call(this);
+	SirgamesOne.PartyPoints.forceUpdate();
 }
 
 
